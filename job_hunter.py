@@ -30,6 +30,13 @@ def save_seen_urls(seen: set) -> None:
         json.dump(sorted(seen), f)
 
 
+def job_key(job: dict) -> str:
+    """Normalized title+company key for cross-platform deduplication."""
+    title = (job.get("title") or "").strip().lower()
+    company = (job.get("company") or "").strip().lower()
+    return f"{title}||{company}"
+
+
 def is_blocked(job: dict, blocklist: dict) -> bool:
     company = (job.get("company") or "").strip().lower()
     if company in [c.lower() for c in blocklist.get("companies", [])]:
@@ -134,17 +141,32 @@ def main() -> None:
         return
 
     blocklist = cfg.get("blocklist", {})
-    new_jobs = [
-        j for j in all_jobs
-        if j.get("job_url")
-        and j["job_url"] not in seen
-        and not is_blocked(j, blocklist)
-    ]
+    new_jobs = []
+    seen_keys_this_run = set()
+    for j in all_jobs:
+        if not j.get("job_url"):
+            continue
+        if is_blocked(j, blocklist):
+            continue
+        url = j["job_url"]
+        key = job_key(j)
+        # skip if seen before (by URL or by title+company across platforms)
+        if url in seen or key in seen:
+            continue
+        # skip duplicates within this run (same title+company from two platforms)
+        if key in seen_keys_this_run:
+            continue
+        new_jobs.append(j)
+        seen_keys_this_run.add(key)
 
     blocked_count = sum(1 for j in all_jobs if is_blocked(j, blocklist))
     print(f"Total: {len(all_jobs)}, blocked: {blocked_count}, new: {len(new_jobs)}")
 
-    seen.update(j["job_url"] for j in all_jobs if j.get("job_url"))
+    # persist both URLs and title+company keys
+    for j in all_jobs:
+        if j.get("job_url"):
+            seen.add(j["job_url"])
+            seen.add(job_key(j))
     save_seen_urls(seen)
 
     if new_jobs:
