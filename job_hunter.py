@@ -8,6 +8,8 @@ from pathlib import Path
 
 from jobspy import scrape_jobs
 
+from watchlist_scraper import scrape_watchlist
+
 BASE_DIR = Path(__file__).parent
 CONFIG_FILE = BASE_DIR / "config.json"
 SEEN_JOBS_FILE = BASE_DIR / "seen_jobs.json"
@@ -49,25 +51,41 @@ def is_blocked(job: dict, blocklist: dict) -> bool:
 
 def scrape(cfg: dict) -> list[dict]:
     search = cfg["search"]
+    locations = search.get("locations") or [search.get("location", "Seattle, WA")]
     results = []
-    for site in ("linkedin", "indeed"):
-        try:
-            df = scrape_jobs(
-                site_name=[site],
-                search_term=search["query"],
-                location=search["location"],
-                results_wanted=search["results_wanted"],
-                hours_old=search["hours_old"],
-            )
-            if df is not None and not df.empty:
-                results.extend(df.to_dict("records"))
-                print(f"  {site}: 抓到 {len(df)} 条")
-        except Exception as e:
-            print(f"  {site}: 抓取失败 — {e}")
+
+    # ── Job boards (LinkedIn, Indeed, Glassdoor, ZipRecruiter) ──
+    for site in search.get("sites", ["linkedin", "indeed"]):
+        site_total = 0
+        for location in locations:
+            try:
+                df = scrape_jobs(
+                    site_name=[site],
+                    search_term=search["query"],
+                    location=location,
+                    results_wanted=search["results_wanted"],
+                    hours_old=search["hours_old"],
+                )
+                if df is not None and not df.empty:
+                    results.extend(df.to_dict("records"))
+                    site_total += len(df)
+            except Exception as e:
+                print(f"  {site} ({location}): failed — {e}")
+        if site_total:
+            print(f"  {site}: {site_total} jobs across {len(locations)} cities")
+
+    # ── Watchlist (company career pages) ──
+    watchlist = cfg.get("watchlist", [])
+    if watchlist:
+        keywords = search.get("keywords", ["HRBP", "HR Business Partner"])
+        # Watchlist scrapers filter by city name — pass all cities
+        watchlist_jobs = scrape_watchlist(watchlist, keywords, locations)
+        results.extend(watchlist_jobs)
+
     return results
 
 
-def build_html(jobs: list[dict]) -> str:
+def build_html(jobs: list[dict], total_new: int) -> str:
     rows = ""
     for j in jobs:
         title = j.get("title") or "N/A"
@@ -88,10 +106,18 @@ def build_html(jobs: list[dict]) -> str:
           <td style="padding:8px 12px;">{date_posted}</td>
         </tr>"""
 
+    truncated = total_new - len(jobs)
+    truncation_note = (
+        f'<p style="color:#e07000;">Showing {len(jobs)} of {total_new} new jobs. '
+        f'{truncated} more not shown — lower <code>max_email_jobs</code> in config.json or run again tomorrow.</p>'
+        if truncated > 0 else ""
+    )
+
     return f"""
 <html><body style="font-family:Arial,sans-serif;color:#333;">
 <h2 style="color:#1a6fc4;">Seattle HRBP New Jobs · {datetime.now().strftime('%Y-%m-%d')}</h2>
-<p><strong>{len(jobs)}</strong> new jobs found (LinkedIn + Indeed)</p>
+<p><strong>{len(jobs)}</strong> new jobs found</p>
+{truncation_note}
 <table border="1" cellpadding="0" cellspacing="0"
        style="border-collapse:collapse;width:100%;font-size:14px;">
   <thead style="background:#f5f5f5;">
@@ -115,7 +141,9 @@ def send_email(jobs: list[dict], cfg: dict) -> None:
     if not password:
         raise RuntimeError("GMAIL_APP_PASSWORD environment variable not set.")
 
-    html = build_html(jobs)
+    max_jobs = cfg.get("max_email_jobs", 100)
+    display_jobs = jobs[:max_jobs]
+    html = build_html(display_jobs, total_new=len(jobs))
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"[Job Hunter] Seattle HRBP · {datetime.now().strftime('%Y-%m-%d')} · {len(jobs)} new"
     msg["From"] = cfg["sender_email"]

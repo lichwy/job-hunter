@@ -2,14 +2,28 @@
   "sender_email": "lichwy1024@gmail.com",
   "recipients": ["lichwy1024@gmail.com", "gracewang028@gmail.com"],
   "search": {
+    "sites": ["linkedin", "indeed", "glassdoor", "zip_recruiter"],
     "query": "HRBP OR \"HR Business Partner\"",
-    "location": "Seattle, WA",
+    "keywords": ["HRBP", "HR Business Partner"],
+    "locations": ["Seattle, WA", "Bellevue, WA", "Kirkland, WA", "Redmond, WA", "Lynnwood, WA", "Renton, WA"],
     "results_wanted": 50,
     "hours_old": 48
   },
+  "watchlist": [
+    {"company": "Microsoft",  "ats": "microsoft"},
+    {"company": "Nordstrom",  "ats": "workday", "tenant": "nordstrom", "instance": "wd501", "site": "nordstrom_careers"},
+    {"company": "T-Mobile",   "ats": "workday", "tenant": "tmobile",   "instance": "wd1",  "site": "External"},
+    {"company": "Zillow",     "ats": "workday", "tenant": "zillow",    "instance": "wd5",  "site": "Zillow_Group_External"},
+    {"company": "Redfin",     "ats": "workday", "tenant": "redfin",    "instance": "wd1",  "site": "redfin_careers"},
+    {"company": "Snowflake",  "ats": "greenhouse", "board": "snowflake"},
+    {"company": "Stripe",     "ats": "greenhouse", "board": "stripe"},
+    {"company": "Google",     "ats": "google"},
+    {"company": "Meta",       "ats": "meta"}
+  ],
   "blocklist": {
     "companies": ["Amazon", "Amazon.com", "Amazon Web Services"],
     "title_keywords": ["Director", "VP", "Vice President", "SVP", "EVP", "Head of", "Chief", "Managing Director", "Principal"]
   },
-  "schedule_time": "08:00"
+  "schedule_time": "08:00",
+  "max_email_jobs": 100
 }
