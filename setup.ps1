@@ -14,13 +14,12 @@ try {
     $pyVersion = python --version 2>&1
     Write-Host "OK: $pyVersion found"
 } catch {
-    Write-Host "ERROR: Python is not installed." -ForegroundColor Red
+    Write-Host "Python is not installed. Opening the download page in your browser..." -ForegroundColor Yellow
+    Start-Process "https://www.python.org/downloads/"
     Write-Host ""
-    Write-Host "Please install it first:"
-    Write-Host "  1. Open: https://www.python.org/downloads/"
-    Write-Host "  2. Download and run the installer"
-    Write-Host "  3. IMPORTANT: check 'Add Python to PATH' during install"
-    Write-Host "  4. Re-run this script"
+    Write-Host "  1. Download and run the Python installer from the page that just opened"
+    Write-Host "  2. IMPORTANT: check 'Add Python to PATH' before clicking Install" -ForegroundColor Yellow
+    Write-Host "  3. Re-run this script"
     Read-Host "Press Enter to exit"
     exit 1
 }

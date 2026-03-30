@@ -13,12 +13,11 @@ echo ""
 # ── Check Python ──────────────────────────────────────────
 PYTHON=$(command -v python3 2>/dev/null || true)
 if [ -z "$PYTHON" ]; then
-  echo "ERROR: Python 3 is not installed."
+  echo "Python 3 is not installed. Opening the download page in your browser..."
+  open "https://www.python.org/downloads/"
   echo ""
-  echo "Please install it first:"
-  echo "  1. Open: https://www.python.org/downloads/"
-  echo "  2. Download and install the latest version"
-  echo "  3. Re-run this script"
+  echo "  1. Download and install Python from the page that just opened"
+  echo "  2. Re-run this script"
   exit 1
 fi
 echo "✓ Python found: $($PYTHON --version)"

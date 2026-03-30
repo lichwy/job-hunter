@@ -30,17 +30,11 @@ git clone https://github.com/lichwy/job-hunter.git
 
 ## Step 2 — Install Python (if you don't have it)
 
-1. Open **https://www.python.org/downloads/**
-2. Click the big **Download Python** button
-3. Run the installer
-   - **Windows only:** make sure to check **"Add Python to PATH"** before clicking Install
+**The setup script will detect if Python is missing and automatically open the download page in your browser.**
 
-To verify Python is installed, open Terminal (Mac) or PowerShell (Windows) and run:
-```
-python3 --version   # Mac
-python --version    # Windows
-```
-You should see something like `Python 3.12.x`.
+Just follow the installer — one thing to watch out for on Windows: make sure to check **"Add Python to PATH"** before clicking Install.
+
+After installing, re-run the setup script from Step 3.
 
 ---
 
