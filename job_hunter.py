@@ -33,7 +33,6 @@ def save_seen_urls(seen: set) -> None:
 
 
 def job_key(job: dict) -> str:
-    """Normalized title+company key for cross-platform deduplication."""
     title = (job.get("title") or "").strip().lower()
     company = (job.get("company") or "").strip().lower()
     return f"{title}||{company}"
@@ -54,7 +53,6 @@ def scrape(cfg: dict) -> list[dict]:
     locations = search.get("locations") or [search.get("location", "Seattle, WA")]
     results = []
 
-    # ── Job boards (LinkedIn, Indeed, Glassdoor, ZipRecruiter) ──
     for site in search.get("sites", ["linkedin", "indeed"]):
         site_total = 0
         for location in locations:
@@ -74,18 +72,15 @@ def scrape(cfg: dict) -> list[dict]:
         if site_total:
             print(f"  {site}: {site_total} jobs across {len(locations)} cities")
 
-    # ── Watchlist (company career pages) ──
     watchlist = cfg.get("watchlist", [])
     if watchlist:
         keywords = search.get("keywords", ["HRBP", "HR Business Partner"])
-        # Watchlist scrapers filter by city name — pass all cities
-        watchlist_jobs = scrape_watchlist(watchlist, keywords, locations)
-        results.extend(watchlist_jobs)
+        results.extend(scrape_watchlist(watchlist, keywords, locations))
 
     return results
 
 
-def build_html(jobs: list[dict], total_new: int) -> str:
+def _job_table(jobs: list[dict], total: int, cap: int) -> str:
     rows = ""
     for j in jobs:
         title = j.get("title") or "N/A"
@@ -94,9 +89,7 @@ def build_html(jobs: list[dict], total_new: int) -> str:
         url = j.get("job_url") or ""
         site = (j.get("site") or "").capitalize()
         date_posted = j.get("date_posted") or ""
-
         title_cell = f'<a href="{url}" style="color:#1a6fc4;">{title}</a>' if url else title
-
         rows += f"""
         <tr>
           <td style="padding:8px 12px;">{title_cell}</td>
@@ -106,20 +99,14 @@ def build_html(jobs: list[dict], total_new: int) -> str:
           <td style="padding:8px 12px;">{date_posted}</td>
         </tr>"""
 
-    truncated = total_new - len(jobs)
-    truncation_note = (
-        f'<p style="color:#e07000;">Showing {len(jobs)} of {total_new} new jobs. '
-        f'{truncated} more not shown — lower <code>max_email_jobs</code> in config.json or run again tomorrow.</p>'
-        if truncated > 0 else ""
+    cap_note = (
+        f'<p style="color:#e07000;margin:4px 0;">Showing {cap} of {total} — '
+        f'{total - cap} more omitted (raise <code>max_email_jobs</code> in config.json to see all)</p>'
+        if total > cap else ""
     )
-
-    return f"""
-<html><body style="font-family:Arial,sans-serif;color:#333;">
-<h2 style="color:#1a6fc4;">Seattle HRBP New Jobs · {datetime.now().strftime('%Y-%m-%d')}</h2>
-<p><strong>{len(jobs)}</strong> new jobs found</p>
-{truncation_note}
+    return f"""{cap_note}
 <table border="1" cellpadding="0" cellspacing="0"
-       style="border-collapse:collapse;width:100%;font-size:14px;">
+       style="border-collapse:collapse;width:100%;font-size:14px;margin-bottom:32px;">
   <thead style="background:#f5f5f5;">
     <tr>
       <th style="padding:8px 12px;text-align:left;">Title</th>
@@ -131,21 +118,56 @@ def build_html(jobs: list[dict], total_new: int) -> str:
   </thead>
   <tbody>{rows}
   </tbody>
-</table>
-<p style="color:#888;font-size:12px;margin-top:20px;">Sent by job_hunter · edit config.json to customize</p>
+</table>"""
+
+
+def build_html(new_jobs: list[dict], old_jobs: list[dict], cap: int) -> str:
+    date_str = datetime.now().strftime("%Y-%m-%d")
+
+    new_section = ""
+    if new_jobs:
+        display = new_jobs[:cap]
+        new_section = f"""
+<h2 style="color:#1a6fc4;margin-top:0;">🆕 New Jobs · {len(new_jobs)} found</h2>
+{_job_table(display, len(new_jobs), cap)}"""
+    else:
+        new_section = '<h2 style="color:#1a6fc4;margin-top:0;">🆕 New Jobs</h2><p style="color:#888;">No new jobs today.</p>'
+
+    old_section = ""
+    if old_jobs:
+        display = old_jobs[:cap]
+        old_section = f"""
+<h2 style="color:#555;border-top:2px solid #eee;padding-top:24px;">📋 Still Active · {len(old_jobs)} previously seen</h2>
+<p style="color:#888;font-size:13px;margin-top:-8px;">These jobs appeared in today's search but were already sent before.</p>
+{_job_table(display, len(old_jobs), cap)}"""
+
+    return f"""
+<html><body style="font-family:Arial,sans-serif;color:#333;max-width:900px;">
+<p style="color:#888;font-size:13px;margin-bottom:24px;">{date_str} · Seattle area HRBP · job_hunter</p>
+{new_section}
+{old_section}
 </body></html>"""
 
 
-def send_email(jobs: list[dict], cfg: dict) -> None:
+def send_email(new_jobs: list[dict], old_jobs: list[dict], cfg: dict) -> None:
     password = os.environ.get("GMAIL_APP_PASSWORD", "")
     if not password:
         raise RuntimeError("GMAIL_APP_PASSWORD environment variable not set.")
 
-    max_jobs = cfg.get("max_email_jobs", 100)
-    display_jobs = jobs[:max_jobs]
-    html = build_html(display_jobs, total_new=len(jobs))
+    cap = cfg.get("max_email_jobs", 100)
+    html = build_html(new_jobs, old_jobs, cap)
+
+    new_count = len(new_jobs)
+    old_count = len(old_jobs)
+    subject_parts = []
+    if new_count:
+        subject_parts.append(f"{new_count} new")
+    if old_count:
+        subject_parts.append(f"{old_count} still active")
+    subject = f"[Job Hunter] Seattle HRBP · {datetime.now().strftime('%Y-%m-%d')} · {', '.join(subject_parts)}"
+
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"[Job Hunter] Seattle HRBP · {datetime.now().strftime('%Y-%m-%d')} · {len(jobs)} new"
+    msg["Subject"] = subject
     msg["From"] = cfg["sender_email"]
     msg["To"] = ", ".join(cfg["recipients"])
     msg.attach(MIMEText(html, "html", "utf-8"))
@@ -170,37 +192,36 @@ def main() -> None:
 
     blocklist = cfg.get("blocklist", {})
     new_jobs = []
+    old_jobs = []
     seen_keys_this_run = set()
+
     for j in all_jobs:
-        if not j.get("job_url"):
-            continue
-        if is_blocked(j, blocklist):
+        if not j.get("job_url") or is_blocked(j, blocklist):
             continue
         url = j["job_url"]
         key = job_key(j)
-        # skip if seen before (by URL or by title+company across platforms)
-        if url in seen or key in seen:
-            continue
-        # skip duplicates within this run (same title+company from two platforms)
         if key in seen_keys_this_run:
-            continue
-        new_jobs.append(j)
+            continue  # cross-platform duplicate within this run
         seen_keys_this_run.add(key)
+        if url in seen or key in seen:
+            old_jobs.append(j)
+        else:
+            new_jobs.append(j)
 
     blocked_count = sum(1 for j in all_jobs if is_blocked(j, blocklist))
-    print(f"Total: {len(all_jobs)}, blocked: {blocked_count}, new: {len(new_jobs)}")
+    print(f"Total: {len(all_jobs)}, blocked: {blocked_count}, new: {len(new_jobs)}, still active: {len(old_jobs)}")
 
-    # persist both URLs and title+company keys
+    # Persist after sorting so new jobs are marked seen next time
     for j in all_jobs:
         if j.get("job_url"):
             seen.add(j["job_url"])
             seen.add(job_key(j))
     save_seen_urls(seen)
 
-    if new_jobs:
-        send_email(new_jobs, cfg)
+    if new_jobs or old_jobs:
+        send_email(new_jobs, old_jobs, cfg)
     else:
-        print("No new jobs, skipping email.")
+        print("Nothing to send.")
 
     print("=== Done ===")
 
