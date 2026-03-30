@@ -2,10 +2,6 @@
 Scrapes jobs directly from company career pages.
 Supports: Workday, Greenhouse, Microsoft, Google, Meta.
 """
-import json as _json
-import re
-from urllib.parse import quote
-
 import requests
 
 HEADERS = {
@@ -99,120 +95,21 @@ def scrape_workday(entry: dict, keywords: list[str], locations) -> list[dict]:
     return jobs
 
 
-# ── Microsoft ─────────────────────────────────────────────────────────────────
-
-def scrape_microsoft(entry: dict, keywords: list[str], locations) -> list[dict]:
-    company = entry["company"]
-    url = (
-        "https://gcsservices.careers.microsoft.com/search/api/v1/search"
-        f"?q={quote(' OR '.join(keywords))}"
-        "&lc=Seattle%2C+Washington%2C+United+States"
-        "&l=en_us&pg=1&pgSz=20&o=Relevance&flt=true"
-    )
-    resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
-    resp.raise_for_status()
-
-    jobs = []
-    result = resp.json().get("operationResult", {}).get("result", {})
-    for job in result.get("jobs", []):
-        title = job.get("title", "")
-        if not _keyword_match(title, keywords):
-            continue
-        job_id = job.get("jobId", "")
-        jobs.append({
-            "title": title,
-            "company": company,
-            "location": job.get("primaryLocation", ""),
-            "job_url": f"https://careers.microsoft.com/us/en/job/{job_id}",
-            "site": "microsoft careers",
-            "date_posted": (job.get("postedDate") or "")[:10],
-        })
-    return jobs
-
-
-# ── Google ────────────────────────────────────────────────────────────────────
-
-def scrape_google(entry: dict, keywords: list[str], locations) -> list[dict]:
-    company = entry["company"]
-    url = (
-        "https://careers.google.com/api/v3/search/"
-        f"?q={quote(' '.join(keywords))}"
-        "&location=Seattle%2C+WA%2C+USA&distance=50mi"
-    )
-    resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
-    resp.raise_for_status()
-
-    jobs = []
-    for job in resp.json().get("jobs", []):
-        title = job.get("title", "")
-        if not _keyword_match(title, keywords):
-            continue
-        locs = [a.get("display", "") for a in job.get("locations", [])]
-        jobs.append({
-            "title": title,
-            "company": company,
-            "location": ", ".join(locs),
-            "job_url": job.get("apply_url", ""),
-            "site": "google careers",
-            "date_posted": "",
-        })
-    return jobs
-
-
-# ── Meta ──────────────────────────────────────────────────────────────────────
-
-def scrape_meta(entry: dict, keywords: list[str], locations) -> list[dict]:
-    company = entry["company"]
-    url = (
-        f"https://www.metacareers.com/jobs"
-        f"?q={quote(' '.join(keywords))}&offices[0]=Seattle%2C+WA"
-    )
-    resp = requests.get(url, headers={**HEADERS, "Accept": "text/html"}, timeout=TIMEOUT)
-    resp.raise_for_status()
-
-    # Job data is embedded as JSON inside a <script> tag
-    match = re.search(r'"job_postings"\s*:\s*(\[.*?\])\s*[,}]', resp.text, re.DOTALL)
-    if not match:
-        return []
-    try:
-        raw = _json.loads(match.group(1))
-    except Exception:
-        return []
-
-    jobs = []
-    for job in raw:
-        title = job.get("title", "")
-        if not _keyword_match(title, keywords):
-            continue
-        locs = job.get("locations", [])
-        loc_str = locs[0] if locs else ""
-        if not _location_match(loc_str, location):
-            continue
-        jobs.append({
-            "title": title,
-            "company": company,
-            "location": loc_str,
-            "job_url": f"https://www.metacareers.com/jobs/{job.get('id', '')}",
-            "site": "meta careers",
-            "date_posted": "",
-        })
-    return jobs
-
-
 # ── Router ────────────────────────────────────────────────────────────────────
 
 _SCRAPERS = {
     "greenhouse": scrape_greenhouse,
     "workday": scrape_workday,
-    "microsoft": scrape_microsoft,
-    "google": scrape_google,
-    "meta": scrape_meta,
 }
 
 
 def scrape_watchlist(watchlist: list[dict], keywords: list[str], locations) -> list[dict]:
     all_jobs = []
     for entry in watchlist:
+        if entry.get("enabled") is False:
+            note = entry.get("note", "disabled in config")
+            print(f"  [watchlist] {entry.get('company')}: skipped ({note})")
+            continue
         ats = entry.get("ats", "")
         scraper = _SCRAPERS.get(ats)
         if not scraper:
