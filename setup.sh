@@ -3,43 +3,89 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PYTHON=$(command -v python3)
-
-echo "=== Job Hunter Setup (macOS) ==="
-
-# 1. Install dependencies
-echo "[1/3] Installing Python dependencies..."
-"$PYTHON" -m pip install -r "$SCRIPT_DIR/requirements.txt" --break-system-packages -q \
-  || "$PYTHON" -m pip install -r "$SCRIPT_DIR/requirements.txt" -q
-
-# 2. Gmail App Password
-if [ -z "$GMAIL_APP_PASSWORD" ]; then
-  echo ""
-  echo "[2/3] Gmail App Password not set."
-  echo "  → Go to: https://myaccount.google.com/apppasswords"
-  echo "  → Create an app password for 'job-hunter'"
-  echo ""
-  read -rp "Paste your 16-character app password: " app_password
-  shell_rc="$HOME/.zshrc"
-  [ -f "$HOME/.bashrc" ] && shell_rc="$HOME/.bashrc"
-  echo "export GMAIL_APP_PASSWORD=\"$app_password\"" >> "$shell_rc"
-  export GMAIL_APP_PASSWORD="$app_password"
-  echo "  ✓ Saved to $shell_rc"
-else
-  echo "[2/3] GMAIL_APP_PASSWORD already set, skipping."
-fi
-
-# 3. Schedule daily cron job at time from config.json
-SCHEDULE_TIME=$(python3 -c "import json; c=json.load(open('$SCRIPT_DIR/config.json')); print(c.get('schedule_time','08:00'))")
-HOUR="${SCHEDULE_TIME%%:*}"
-MINUTE="${SCHEDULE_TIME##*:}"
-CRON_LINE="$MINUTE $HOUR * * * source ~/.zshrc && $PYTHON $SCRIPT_DIR/job_hunter.py >> $SCRIPT_DIR/log.txt 2>&1"
-
-echo "[3/3] Setting up daily cron job at ${SCHEDULE_TIME}..."
-( crontab -l 2>/dev/null | grep -v "job_hunter.py"; echo "$CRON_LINE" ) | crontab -
-echo "  ✓ Cron job set"
 
 echo ""
-echo "=== Setup complete! ==="
-echo "Run manually anytime:  bash $SCRIPT_DIR/run_now.sh"
-echo "View logs:             tail -f $SCRIPT_DIR/log.txt"
+echo "========================================"
+echo "   Job Hunter Setup — macOS"
+echo "========================================"
+echo ""
+
+# ── Check Python ──────────────────────────────────────────
+PYTHON=$(command -v python3 2>/dev/null || true)
+if [ -z "$PYTHON" ]; then
+  echo "ERROR: Python 3 is not installed."
+  echo ""
+  echo "Please install it first:"
+  echo "  1. Open: https://www.python.org/downloads/"
+  echo "  2. Download and install the latest version"
+  echo "  3. Re-run this script"
+  exit 1
+fi
+echo "✓ Python found: $($PYTHON --version)"
+
+# ── Step 1: Install dependencies ─────────────────────────
+echo ""
+echo "Step 1/3 — Installing dependencies..."
+"$PYTHON" -m pip install -r "$SCRIPT_DIR/requirements.txt" --break-system-packages -q 2>/dev/null \
+  || "$$PYTHON" -m pip install -r "$SCRIPT_DIR/requirements.txt" -q
+echo "✓ Done"
+
+# ── Step 2: Gmail App Password ────────────────────────────
+echo ""
+echo "Step 2/3 — Gmail App Password"
+
+if [ -n "$GMAIL_APP_PASSWORD" ]; then
+  echo "✓ Already configured, skipping"
+else
+  echo ""
+  echo "You need a Gmail App Password to send emails."
+  echo "It is different from your regular Gmail password."
+  echo ""
+  echo "How to get one:"
+  echo "  1. Open this link in your browser:"
+  echo "     https://myaccount.google.com/apppasswords"
+  echo "  2. Sign in with the Gmail account you want to send from"
+  echo "  3. Type any name (e.g. job-hunter) and click 'Create'"
+  echo "  4. Copy the 16-character password shown"
+  echo ""
+  read -rp "Paste the password here and press Enter: " app_password
+  if [ -z "$app_password" ]; then
+    echo "ERROR: No password entered. Exiting."
+    exit 1
+  fi
+
+  # Save to shell config
+  SHELL_RC="$HOME/.zshrc"
+  echo "" >> "$SHELL_RC"
+  echo "export GMAIL_APP_PASSWORD=\"$app_password\"" >> "$SHELL_RC"
+  export GMAIL_APP_PASSWORD="$app_password"
+  echo "✓ Password saved"
+fi
+
+# ── Step 3: Schedule daily cron job ──────────────────────
+echo ""
+echo "Step 3/3 — Scheduling daily job..."
+
+SCHEDULE_TIME=$("$PYTHON" -c "import json; c=json.load(open('$SCRIPT_DIR/config.json')); print(c.get('schedule_time','08:00'))")
+HOUR="${SCHEDULE_TIME%%:*}"
+MINUTE="${SCHEDULE_TIME##*:}"
+CRON_LINE="$MINUTE $HOUR * * * source \$HOME/.zshrc && $PYTHON $SCRIPT_DIR/job_hunter.py >> $SCRIPT_DIR/log.txt 2>&1"
+
+( crontab -l 2>/dev/null | grep -v "job_hunter.py"; echo "$CRON_LINE" ) | crontab -
+echo "✓ Scheduled to run daily at $SCHEDULE_TIME"
+
+# ── Done ──────────────────────────────────────────────────
+echo ""
+echo "========================================"
+echo "   Setup complete!"
+echo "========================================"
+echo ""
+echo "The script will run automatically every day at $SCHEDULE_TIME."
+echo "Results will be emailed to you."
+echo ""
+echo "To run it right now:"
+echo "  bash $SCRIPT_DIR/run_now.sh"
+echo ""
+echo "To view past logs:"
+echo "  cat $SCRIPT_DIR/log.txt"
+echo ""
