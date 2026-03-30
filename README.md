@@ -86,19 +86,41 @@ You need a **Gmail App Password** — this is different from your regular Gmail 
 
 ---
 
-## Run manually anytime
+## Run it right now (one-time)
 
-After setup, you can trigger a run whenever you want:
+After setup, you can trigger a search anytime without waiting for the scheduled time.
 
-**Mac:**
+### Mac
+
+1. Open **Terminal** (press `Cmd + Space`, type `Terminal`, press Enter)
+2. Drag the `job-hunter-main` folder from Finder into the Terminal window — this fills in the path for you
+3. Type `bash run_now.sh` and press Enter
+
+Or in one go, if you put the folder on your Desktop:
 ```bash
-bash /path/to/job-hunter/run_now.sh
+bash ~/Desktop/job-hunter-main/run_now.sh
 ```
 
-**Windows (PowerShell):**
+### Windows
+
+1. Open the `job-hunter-main` folder in File Explorer
+2. Click the address bar at the top of the window, type `powershell`, press Enter — this opens PowerShell directly in that folder
+3. Type the following and press Enter:
 ```powershell
-python C:\path\to\job-hunter\job_hunter.py
+python job_hunter.py
 ```
+
+You'll see output like:
+```
+=== job_hunter started 2026-03-30 08:00 ===
+  linkedin: found 10 jobs
+  indeed: found 8 jobs
+Total: 18, blocked: 9, new: 9
+Email sent to [...]
+=== Done ===
+```
+
+If it says `No new jobs` — all found jobs were already sent to you before. Delete `seen_jobs.json` in the folder and run again to force a fresh send.
 
 ---
 
