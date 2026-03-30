@@ -1,0 +1,14 @@
+{
+  "sender_email": "lichwy1024@gmail.com",
+  "recipients": ["lichwy1024@gmail.com", "gracewang028@gmail.com"],
+  "search": {
+    "query": "HRBP OR \"HR Business Partner\"",
+    "location": "Seattle, WA",
+    "results_wanted": 50,
+    "hours_old": 48
+  },
+  "blocklist": {
+    "companies": ["Amazon", "Amazon.com", "Amazon Web Services"]
+  },
+  "schedule_time": "08:00"
+}
