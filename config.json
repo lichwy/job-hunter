@@ -8,7 +8,8 @@
     "hours_old": 48
   },
   "blocklist": {
-    "companies": ["Amazon", "Amazon.com", "Amazon Web Services"]
+    "companies": ["Amazon", "Amazon.com", "Amazon Web Services"],
+    "title_keywords": ["Director", "VP", "Vice President", "SVP", "EVP", "Head of", "Chief", "Managing Director", "Principal"]
   },
   "schedule_time": "08:00"
 }

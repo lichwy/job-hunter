@@ -48,7 +48,8 @@ Edit `config.json` to customize behavior:
     "hours_old": 48
   },
   "blocklist": {
-    "companies": ["Amazon", "Amazon.com", "Amazon Web Services"]
+    "companies": ["Amazon", "Amazon.com", "Amazon Web Services"],
+    "title_keywords": ["Director", "VP", "Vice President", "SVP", "EVP", "Head of", "Chief", "Managing Director", "Principal"]
   },
   "schedule_time": "08:00"
 }
@@ -62,6 +63,7 @@ Edit `config.json` to customize behavior:
 | `search.location` | Target city/region |
 | `search.hours_old` | Only scrape jobs posted within this many hours |
 | `blocklist.companies` | Companies to exclude (case-insensitive) |
+| `blocklist.title_keywords` | Job title keywords to exclude (case-insensitive, e.g. "Director", "VP") |
 | `schedule_time` | Daily run time in `HH:MM` 24h format |
 
 ---

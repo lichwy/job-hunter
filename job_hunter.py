@@ -32,8 +32,12 @@ def save_seen_urls(seen: set) -> None:
 
 def is_blocked(job: dict, blocklist: dict) -> bool:
     company = (job.get("company") or "").strip().lower()
-    blocked_companies = [c.lower() for c in blocklist.get("companies", [])]
-    return company in blocked_companies
+    if company in [c.lower() for c in blocklist.get("companies", [])]:
+        return True
+    title = (job.get("title") or "").lower()
+    if any(kw.lower() in title for kw in blocklist.get("title_keywords", [])):
+        return True
+    return False
 
 
 def scrape(cfg: dict) -> list[dict]:
