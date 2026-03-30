@@ -1,0 +1,5 @@
+seen_jobs.json
+log.txt
+__pycache__/
+*.pyc
+.env
