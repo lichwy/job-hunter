@@ -44,7 +44,7 @@ def scrape_greenhouse(entry: dict, keywords: list[str], locations) -> list[dict]
         if not _keyword_match(title, keywords):
             continue
         loc = job.get("location", {}).get("name", "") or ""
-        if not _location_match(loc, location):
+        if not _location_match(loc, locations):
             continue
         jobs.append({
             "title": title,
@@ -81,7 +81,7 @@ def scrape_workday(entry: dict, keywords: list[str], locations) -> list[dict]:
         if not _keyword_match(title, keywords):
             continue
         loc = job.get("locationsText", "") or ""
-        if not _location_match(loc, location):
+        if not _location_match(loc, locations):
             continue
         path = job.get("externalPath", "")
         jobs.append({

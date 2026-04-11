@@ -32,19 +32,82 @@ def save_seen_urls(seen: set) -> None:
         json.dump(sorted(seen), f)
 
 
+def _str(val) -> str:
+    """Return string value, treating None/NaN/non-string as empty string."""
+    if val is None:
+        return ""
+    try:
+        if val != val:  # NaN check
+            return ""
+    except TypeError:
+        pass
+    return str(val).strip()
+
+
 def job_key(job: dict) -> str:
-    title = (job.get("title") or "").strip().lower()
-    company = (job.get("company") or "").strip().lower()
+    title = _str(job.get("title")).lower()
+    company = _str(job.get("company")).lower()
     return f"{title}||{company}"
 
 
+def get_annual_salary(job: dict) -> float | None:
+    """Return annualized min salary, or None if not available."""
+    try:
+        amount = job.get("min_amount")
+        if amount is None or amount != amount:  # None or NaN
+            return None
+        amount = float(amount)
+        interval = _str(job.get("interval")).lower()
+        if interval == "hourly":
+            return amount * 2080  # 40h × 52w
+        if interval in ("yearly", "annual", ""):
+            return amount if amount > 0 else None
+        return amount if amount > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def salary_label(job: dict) -> str:
+    """Return a formatted salary string for display, or empty string."""
+    try:
+        lo = job.get("min_amount")
+        hi = job.get("max_amount")
+        interval = _str(job.get("interval")).lower()
+
+        def fmt(v) -> str | None:
+            if v is None or v != v:
+                return None
+            v = float(v)
+            if interval == "hourly":
+                return f"${v:.0f}/hr"
+            return f"${v / 1000:.0f}k"
+
+        lo_s = fmt(lo)
+        hi_s = fmt(hi)
+        if lo_s and hi_s and lo_s != hi_s:
+            return f"{lo_s}–{hi_s}"
+        return lo_s or hi_s or ""
+    except (TypeError, ValueError):
+        return ""
+
+
+HRBP_TERMS = [
+    "hrbp", "hr business partner", "human resource business partner",
+    "hr generalist", "hr specialist", " hr ", " bp ",
+]
+
+
 def is_blocked(job: dict, blocklist: dict) -> bool:
-    company = (job.get("company") or "").strip().lower()
+    company = _str(job.get("company")).lower()
     if company in [c.lower() for c in blocklist.get("companies", [])]:
         return True
-    title = (job.get("title") or "").lower()
+    title = _str(job.get("title")).lower()
     if any(kw.lower() in title for kw in blocklist.get("title_keywords", [])):
         return True
+    # Block titles that match these keywords only when no HRBP term is present
+    if any(kw.lower() in title for kw in blocklist.get("title_keywords_no_hrbp", [])):
+        if not any(term in title for term in HRBP_TERMS):
+            return True
     return False
 
 
@@ -89,12 +152,14 @@ def _job_table(jobs: list[dict], total: int, cap: int) -> str:
         url = j.get("job_url") or ""
         site = (j.get("site") or "").capitalize()
         date_posted = j.get("date_posted") or ""
+        sal = salary_label(j)
         title_cell = f'<a href="{url}" style="color:#1a6fc4;">{title}</a>' if url else title
         rows += f"""
         <tr>
           <td style="padding:8px 12px;">{title_cell}</td>
           <td style="padding:8px 12px;">{company}</td>
           <td style="padding:8px 12px;">{location}</td>
+          <td style="padding:8px 12px;">{sal}</td>
           <td style="padding:8px 12px;">{site}</td>
           <td style="padding:8px 12px;">{date_posted}</td>
         </tr>"""
@@ -112,6 +177,7 @@ def _job_table(jobs: list[dict], total: int, cap: int) -> str:
       <th style="padding:8px 12px;text-align:left;">Title</th>
       <th style="padding:8px 12px;text-align:left;">Company</th>
       <th style="padding:8px 12px;text-align:left;">Location</th>
+      <th style="padding:8px 12px;text-align:left;">Salary</th>
       <th style="padding:8px 12px;text-align:left;">Source</th>
       <th style="padding:8px 12px;text-align:left;">Posted</th>
     </tr>
@@ -121,25 +187,49 @@ def _job_table(jobs: list[dict], total: int, cap: int) -> str:
 </table>"""
 
 
-def build_html(new_jobs: list[dict], old_jobs: list[dict], cap: int) -> str:
+def _salary_sections(jobs: list[dict], cap: int, threshold: int) -> str:
+    """Split jobs into ≥threshold / <threshold / unknown groups and render tables."""
+    high, low, unknown = [], [], []
+    for j in jobs:
+        sal = get_annual_salary(j)
+        if sal is None:
+            unknown.append(j)
+        elif sal >= threshold:
+            high.append(j)
+        else:
+            low.append(j)
+    thresh_k = threshold // 1000
+
+    html = ""
+    if high:
+        html += f'<h3 style="color:#2e7d32;margin:16px 0 4px;">💰 Base ≥ ${thresh_k}k · {len(high)} jobs</h3>'
+        html += _job_table(high[:cap], len(high), cap)
+    if low:
+        html += f'<h3 style="color:#c62828;margin:16px 0 4px;">📉 Base < ${thresh_k}k · {len(low)} jobs</h3>'
+        html += _job_table(low[:cap], len(low), cap)
+    if unknown:
+        html += f'<h3 style="color:#888;margin:16px 0 4px;">❓ Salary not listed · {len(unknown)} jobs</h3>'
+        html += _job_table(unknown[:cap], len(unknown), cap)
+    return html
+
+
+def build_html(new_jobs: list[dict], old_jobs: list[dict], cap: int, threshold: int) -> str:
     date_str = datetime.now().strftime("%Y-%m-%d")
 
     new_section = ""
     if new_jobs:
-        display = new_jobs[:cap]
         new_section = f"""
 <h2 style="color:#1a6fc4;margin-top:0;">🆕 New Jobs · {len(new_jobs)} found</h2>
-{_job_table(display, len(new_jobs), cap)}"""
+{_salary_sections(new_jobs, cap, threshold)}"""
     else:
         new_section = '<h2 style="color:#1a6fc4;margin-top:0;">🆕 New Jobs</h2><p style="color:#888;">No new jobs today.</p>'
 
     old_section = ""
     if old_jobs:
-        display = old_jobs[:cap]
         old_section = f"""
 <h2 style="color:#555;border-top:2px solid #eee;padding-top:24px;">📋 Still Active · {len(old_jobs)} previously seen</h2>
 <p style="color:#888;font-size:13px;margin-top:-8px;">These jobs appeared in today's search but were already sent before.</p>
-{_job_table(display, len(old_jobs), cap)}"""
+{_salary_sections(old_jobs, cap, threshold)}"""
 
     return f"""
 <html><body style="font-family:Arial,sans-serif;color:#333;max-width:900px;">
@@ -155,7 +245,8 @@ def send_email(new_jobs: list[dict], old_jobs: list[dict], cfg: dict) -> None:
         raise RuntimeError("GMAIL_APP_PASSWORD environment variable not set.")
 
     cap = cfg.get("max_email_jobs", 100)
-    html = build_html(new_jobs, old_jobs, cap)
+    threshold = cfg.get("salary_threshold", 90_000)
+    html = build_html(new_jobs, old_jobs, cap, threshold)
 
     new_count = len(new_jobs)
     old_count = len(old_jobs)
@@ -222,6 +313,10 @@ def main() -> None:
         send_email(new_jobs, old_jobs, cfg)
     else:
         print("Nothing to send.")
+
+    if cfg.get("linkedin_auto_comment") and new_jobs:
+        from linkedin_commenter import comment_on_new_jobs
+        comment_on_new_jobs(new_jobs, cfg)
 
     print("=== Done ===")
 

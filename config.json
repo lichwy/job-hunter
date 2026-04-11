@@ -2,7 +2,7 @@
   "sender_email": "lichwy1024@gmail.com",
   "recipients": ["lichwy1024@gmail.com", "gracewang028@gmail.com"],
   "search": {
-    "sites": ["linkedin", "indeed", "glassdoor", "zip_recruiter"],
+    "sites": ["linkedin", "indeed"],
     "query": "HRBP OR \"HR Business Partner\"",
     "keywords": ["HRBP", "HR Business Partner"],
     "locations": ["Seattle, WA", "Bellevue, WA", "Kirkland, WA", "Redmond, WA", "Lynnwood, WA", "Renton, WA"],
@@ -22,8 +22,12 @@
   ],
   "blocklist": {
     "companies": ["Amazon", "Amazon.com", "Amazon Web Services"],
-    "title_keywords": ["Director", "VP", "Vice President", "SVP", "EVP", "Head of", "Chief", "Managing Director", "Principal"]
+    "title_keywords": ["Director", "VP", "Vice President", "SVP", "EVP", "Head of", "Chief", "Managing Director", "Principal"],
+    "title_keywords_no_hrbp": ["Senior Manager", "Manager"]
   },
   "schedule_time": "08:00",
-  "max_email_jobs": 100
+  "max_email_jobs": 100,
+  "salary_threshold": 90000,
+  "linkedin_email": "gracewang028@gmail.com",
+  "linkedin_auto_comment": false
 }
