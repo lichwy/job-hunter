@@ -2,7 +2,7 @@
   "sender_email": "lichwy1024@gmail.com",
   "recipients": ["lichwy1024@gmail.com", "gracewang028@gmail.com"],
   "search": {
-    "sites": ["linkedin", "indeed"],
+    "sites": ["linkedin", "indeed", "google"],
     "query": "HRBP OR \"HR Business Partner\"",
     "keywords": ["HRBP", "HR Business Partner"],
     "locations": ["Seattle, WA", "Bellevue, WA", "Kirkland, WA", "Redmond, WA", "Lynnwood, WA", "Renton, WA"],
@@ -18,7 +18,8 @@
     {"company": "Snowflake",  "ats": "greenhouse",  "board": "snowflake",  "enabled": false, "note": "Moved off Greenhouse to Phenom; blocks headless API; covered by LinkedIn/Indeed"},
     {"company": "Microsoft",  "ats": "microsoft",   "enabled": false,      "note": "React site, no public API; covered by LinkedIn/Indeed"},
     {"company": "Google",     "ats": "google",      "enabled": false,      "note": "API removed; covered by LinkedIn/Indeed"},
-    {"company": "Meta",       "ats": "meta",        "enabled": false,      "note": "React site, no public API; covered by LinkedIn/Indeed"}
+    {"company": "Meta",       "ats": "meta",        "enabled": false,      "note": "React site, no public API; covered by LinkedIn/Indeed"},
+    {"company": "Built In",  "ats": "builtin",     "city": "seattle",     "pages": 2}
   ],
   "blocklist": {
     "companies": ["Amazon", "Amazon.com", "Amazon Web Services"],
