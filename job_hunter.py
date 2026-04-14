@@ -143,43 +143,61 @@ def scrape(cfg: dict) -> list[dict]:
     return results
 
 
+SITE_EMOJI = {
+    "linkedin": "🔗", "indeed": "🅸", "google": "🔍", "greenhouse": "🌱",
+    "workday": "☀️", "builtin": "🏙️", "glassdoor": "🪟", "zip_recruiter": "⚡",
+}
+
+E = '<span style="font-size:1.35em;vertical-align:middle;">'  # emoji open tag
+
+
+def _e(emoji: str) -> str:
+    """Wrap an emoji in a slightly larger span."""
+    return f'{E}{emoji}</span>'
+
+
 def _job_table(jobs: list[dict], total: int, cap: int) -> str:
     rows = ""
-    for j in jobs:
+    for i, j in enumerate(jobs):
         title = j.get("title") or "N/A"
         company = j.get("company") or "N/A"
         location = j.get("location") or "N/A"
         url = j.get("job_url") or ""
-        site = (j.get("site") or "").capitalize()
+        site_raw = (j.get("site") or "").lower()
+        site_icon = SITE_EMOJI.get(site_raw, "🔹")
+        site = f'{_e(site_icon)} {site_raw.capitalize()}'
         date_posted = j.get("date_posted") or ""
         sal = salary_label(j)
-        title_cell = f'<a href="{url}" style="color:#1a6fc4;">{title}</a>' if url else title
+        title_cell = f'<a href="{url}" style="color:#6b7e99;text-decoration:none;font-weight:600;">{title}</a>' if url else f'<span style="font-weight:600;">{title}</span>'
+        bg = "#f6f8fa" if i % 2 == 0 else "#edf1f5"
+        td = 'style="padding:11px 14px;border-bottom:1px solid #dae1e8;"'
         rows += f"""
-        <tr>
-          <td style="padding:8px 12px;">{title_cell}</td>
-          <td style="padding:8px 12px;">{company}</td>
-          <td style="padding:8px 12px;">{location}</td>
-          <td style="padding:8px 12px;">{sal}</td>
-          <td style="padding:8px 12px;">{site}</td>
-          <td style="padding:8px 12px;">{date_posted}</td>
+        <tr style="background:{bg};">
+          <td {td}>{title_cell}</td>
+          <td {td}>{company}</td>
+          <td {td}>{location}</td>
+          <td {td}>{sal}</td>
+          <td {td}>{site}</td>
+          <td {td}>{date_posted}</td>
         </tr>"""
 
     cap_note = (
-        f'<p style="color:#e07000;margin:4px 0;">Showing {cap} of {total} — '
+        f'<p style="color:#8a9bae;margin:4px 0;font-size:13px;">{_e("⚠️")} Showing {cap} of {total} — '
         f'{total - cap} more omitted (raise <code>max_email_jobs</code> in config.json to see all)</p>'
         if total > cap else ""
     )
+    th = 'style="padding:11px 14px;text-align:left;border-bottom:2px solid #c1ccd8;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#7e8e9e;"'
     return f"""{cap_note}
-<table border="1" cellpadding="0" cellspacing="0"
-       style="border-collapse:collapse;width:100%;font-size:14px;margin-bottom:32px;">
-  <thead style="background:#f5f5f5;">
+<table cellpadding="0" cellspacing="0"
+       style="border-collapse:collapse;width:100%;font-size:14px;margin-bottom:28px;border-radius:10px;overflow:hidden;border:1px solid #d0d9e2;">
+  <thead style="background:#e2e8ef;">
     <tr>
-      <th style="padding:8px 12px;text-align:left;">Title</th>
-      <th style="padding:8px 12px;text-align:left;">Company</th>
-      <th style="padding:8px 12px;text-align:left;">Location</th>
-      <th style="padding:8px 12px;text-align:left;">Salary</th>
-      <th style="padding:8px 12px;text-align:left;">Source</th>
-      <th style="padding:8px 12px;text-align:left;">Posted</th>
+      <th {th}>{_e('💼')} Title</th>
+      <th {th}>{_e('🏢')} Company</th>
+      <th {th}>{_e('📍')} Location</th>
+      <th {th}>{_e('💰')} Salary</th>
+      <th {th}>{_e('🌐')} Source</th>
+      <th {th}>{_e('🗓️')} Posted</th>
     </tr>
   </thead>
   <tbody>{rows}
@@ -202,13 +220,22 @@ def _salary_sections(jobs: list[dict], cap: int, threshold: int) -> str:
 
     html = ""
     if high:
-        html += f'<h3 style="color:#2e7d32;margin:16px 0 4px;">💰 Base ≥ ${thresh_k}k · {len(high)} jobs</h3>'
+        html += (
+            f'<div style="background:#e4ecf2;border-left:4px solid #7a9bb5;padding:10px 16px;margin:18px 0 10px;border-radius:0 8px 8px 0;">'
+            f'<h3 style="color:#4a6a82;margin:0;font-size:15px;">{_e("💎")} Base ≥ ${thresh_k}k · {len(high)} jobs</h3></div>'
+        )
         html += _job_table(high[:cap], len(high), cap)
     if low:
-        html += f'<h3 style="color:#c62828;margin:16px 0 4px;">📉 Base < ${thresh_k}k · {len(low)} jobs</h3>'
+        html += (
+            f'<div style="background:#e8e4ef;border-left:4px solid #9b8eb5;padding:10px 16px;margin:18px 0 10px;border-radius:0 8px 8px 0;">'
+            f'<h3 style="color:#6b5f82;margin:0;font-size:15px;">{_e("🌊")} Base < ${thresh_k}k · {len(low)} jobs</h3></div>'
+        )
         html += _job_table(low[:cap], len(low), cap)
     if unknown:
-        html += f'<h3 style="color:#888;margin:16px 0 4px;">❓ Salary not listed · {len(unknown)} jobs</h3>'
+        html += (
+            f'<div style="background:#e8ebee;border-left:4px solid #a3adb8;padding:10px 16px;margin:18px 0 10px;border-radius:0 8px 8px 0;">'
+            f'<h3 style="color:#6b7580;margin:0;font-size:15px;">{_e("🌫️")} Salary not listed · {len(unknown)} jobs</h3></div>'
+        )
         html += _job_table(unknown[:cap], len(unknown), cap)
     return html
 
@@ -219,23 +246,40 @@ def build_html(new_jobs: list[dict], old_jobs: list[dict], cap: int, threshold: 
     new_section = ""
     if new_jobs:
         new_section = f"""
-<h2 style="color:#1a6fc4;margin-top:0;">🆕 New Jobs · {len(new_jobs)} found</h2>
+<div style="background:linear-gradient(135deg,#dde5ed,#cdd8e4);border-radius:12px;padding:18px 22px;margin-bottom:24px;">
+  <h2 style="color:#4a5e74;margin:0 0 4px;font-size:20px;">{_e('✨')} New Jobs · {len(new_jobs)} found</h2>
+  <p style="color:#7e92a6;font-size:13px;margin:0;">Fresh listings since last scan {_e('🎯')}</p>
+</div>
 {_salary_sections(new_jobs, cap, threshold)}"""
     else:
-        new_section = '<h2 style="color:#1a6fc4;margin-top:0;">🆕 New Jobs</h2><p style="color:#888;">No new jobs today.</p>'
+        new_section = (
+            '<div style="background:#e6eaef;border-radius:12px;padding:18px 22px;margin-bottom:24px;">'
+            f'<h2 style="color:#6b7d8e;margin:0;font-size:20px;">{_e("🌙")} No New Jobs</h2>'
+            '<p style="color:#96a5b4;font-size:13px;margin:4px 0 0;">Nothing new today — hang tight!</p></div>'
+        )
 
     old_section = ""
     if old_jobs:
         old_section = f"""
-<h2 style="color:#555;border-top:2px solid #eee;padding-top:24px;">📋 Still Active · {len(old_jobs)} previously seen</h2>
-<p style="color:#888;font-size:13px;margin-top:-8px;">These jobs appeared in today's search but were already sent before.</p>
-{_salary_sections(old_jobs, cap, threshold)}"""
+<div style="border-top:2px solid #d0d9e2;margin-top:32px;padding-top:24px;">
+  <div style="background:linear-gradient(135deg,#dfe4ea,#d4dbe4);border-radius:12px;padding:18px 22px;margin-bottom:24px;">
+    <h2 style="color:#5a6e80;margin:0 0 4px;font-size:20px;">{_e('📌')} Still Active · {len(old_jobs)} previously seen</h2>
+    <p style="color:#8e9dac;font-size:13px;margin:0;">These showed up again — still open and worth a look {_e('👀')}</p>
+  </div>
+{_salary_sections(old_jobs, cap, threshold)}
+</div>"""
 
     return f"""
-<html><body style="font-family:Arial,sans-serif;color:#333;max-width:900px;">
-<p style="color:#888;font-size:13px;margin-bottom:24px;">{date_str} · Seattle area HRBP · job_hunter</p>
+<html><body style="font-family:'Georgia',serif;color:#3d4a56;max-width:960px;margin:0 auto;padding:24px;background:#f2f5f8;">
+<div style="margin-bottom:28px;padding-bottom:16px;border-bottom:1px solid #d0d9e2;">
+  <h1 style="margin:0 0 8px;font-size:24px;color:#3d4f62;font-weight:normal;letter-spacing:0.5px;">{_e('🔎')} Job Hunter Report</h1>
+  <p style="color:#8e9dac;font-size:13px;margin:0;letter-spacing:0.3px;">{_e('📅')} {date_str} &nbsp;·&nbsp; {_e('📍')} Seattle area &nbsp;·&nbsp; {_e('👩‍💼')} HRBP</p>
+</div>
 {new_section}
 {old_section}
+<div style="border-top:1px solid #d0d9e2;margin-top:36px;padding-top:16px;text-align:center;">
+  <p style="color:#b0bcc8;font-size:11px;margin:0;letter-spacing:0.3px;">{_e('🤖')} Powered by job_hunter · Made with {_e('♡')}</p>
+</div>
 </body></html>"""
 
 
@@ -255,7 +299,7 @@ def send_email(new_jobs: list[dict], old_jobs: list[dict], cfg: dict) -> None:
         subject_parts.append(f"{new_count} new")
     if old_count:
         subject_parts.append(f"{old_count} still active")
-    subject = f"[Job Hunter] Seattle HRBP · {datetime.now().strftime('%Y-%m-%d')} · {', '.join(subject_parts)}"
+    subject = f"🔎 Job Hunter · Seattle HRBP · {datetime.now().strftime('%Y-%m-%d')} · {', '.join(subject_parts)}"
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
